@@ -1,0 +1,29 @@
+{
+  "name": "twilio-chess",
+  "version": "1.0.0",
+  "description": "Twilio-powered chess",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon src/main.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MissionMike/twilio-chess.git"
+  },
+  "author": "Michael Dinerstein",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/MissionMike/twilio-chess/issues"
+  },
+  "homepage": "https://github.com/MissionMike/twilio-chess#readme",
+  "dependencies": {
+    "dotenv": "^8.2.0",
+    "express": "^4.17.1",
+    "express-session": "^1.17.1",
+    "js-chess-engine": "^0.5.1",
+    "mariadb": "^2.5.1",
+    "nodemon": "^2.0.6",
+    "twilio": "^3.52.0"
+  }
+}
