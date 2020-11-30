@@ -1,21 +1,14 @@
 require("dotenv").config();
 
-const urlFenBase = process.env.URL_FENBASE;
+const port = process.env.EXPRESS_PORT || 3001;
 
-const responseData = require("./response-data.js");
-const messageData = require("./message-data.js");
-
-const jsChessEngine = require("js-chess-engine");
-const Canvas = require("canvas");
-
+/**
+ * Express setup
+ */
+const server = require("express")();
 const bodyParser = require("body-parser");
 const session = require("express-session");
 var MemoryStore = require("memorystore")(session);
-const server = require("express")();
-const MessagingResponse = require("twilio").twiml.MessagingResponse;
-
-const mariadb = require("./mariadb.js");
-const fs = require("fs");
 
 server.use(bodyParser.urlencoded({ extended: true }));
 server.use(
@@ -29,18 +22,26 @@ server.use(
 		saveUninitialized: true,
 	})
 );
-
-const port = process.env.EXPRESS_PORT || 3001;
-
 server.listen(port, () => {
 	console.log(`Listening on port ${port}`);
 });
 
+/**
+ * Twilio setup
+ */
+const MessagingResponse = require("twilio").twiml.MessagingResponse;
+
+/**
+ * POST requests come from Twilio; aim to parse the text and determine the
+ * next steps.
+ */
 server.post("/receive", (request, response) => {
+	const fetchGame = require("./utils/fetch-game.js"); // Helper to fetch game data from mariadb or JSON storage
+
 	const body = request.body;
-	const fromPhone = body.From.replace(/[^a-zA-Z0-9]+/g, "");
-	const lastReceivedTimestamp = request.session.lastReceivedTimestamp;
-	const step = request.session.step;
+	const fromPhone = body.From.replace(/[^a-z0-9]+/g, ""); // Keep only digits
+	const lastReceivedTimestamp = request.session.lastReceivedTimestamp; // This 'last received' timestamp is set a the end of this .post block
+	const step = request.session.step; // Which step are we in this conversation?
 
 	if (!step) {
 		request.session.step = 1;
@@ -54,17 +55,19 @@ server.post("/receive", (request, response) => {
 				throw err;
 			}
 
+			const urlFenBase = process.env.URL_FENBASE || "localhost:" + port;
+			const jsChessEngine = require("js-chess-engine"); // @link https://www.npmjs.com/package/js-chess-engine
+			const isResponse = require("./utils/is-response.js"); // Helper to parse responses
+			const saveGame = require("./utils/save-game.js"); // Helper to interface w/ mariadb or JSON storage
+			const messageData = require("./data/data-messages.js"); // Data for text message responses
+
 			var boardConfiguration = boardConfigurationFromSave.fen || null;
 			var difficulty = boardConfigurationFromSave.difficulty || 2;
 
 			let message = messageData.intro;
 			let mediaUrl = "";
 
-			if (
-				!boardConfiguration &&
-				step >= 1 &&
-				Date.now() - lastReceivedTimestamp > 10
-			) {
+			if (!boardConfiguration && step >= 1 && Date.now() - lastReceivedTimestamp > 10) {
 				if (isResponse("yes", body.Body)) {
 					let game = new jsChessEngine.Game();
 					let fen = game.exportFEN();
@@ -88,7 +91,7 @@ server.post("/receive", (request, response) => {
 					isResponse("restart", request.session.lastMessageReceived) &&
 					isResponse("yes", body.Body)
 				) {
-					resetGame(fromPhone);
+					saveGame(fromPhone, null);
 					message = messageData.resetComplete;
 					request.session.step = 0;
 				} else if (
@@ -141,7 +144,7 @@ server.post("/receive", (request, response) => {
 								messageData.yourTurn[
 									Math.floor(Math.random() * messageData.yourTurn.length)
 								];
-								
+
 							saveGame(fromPhone, fen, difficulty);
 						} catch (err) {
 							console.log(err.message);
@@ -180,8 +183,18 @@ server.post("/receive", (request, response) => {
 		});
 });
 
+/**
+ * GET requests to /fenpng return a PNG image of the current game board,
+ * as represented by GET variable ?fen=[fen-format-data-string]
+ */
 server.get("/fenpng", (request, response) => {
 	if (request.query.fen) {
+		const Canvas = require("canvas");
+		const fs = require("fs");
+
+		/**
+		 * @link https://www.npmjs.com/package/chess-image-generator
+		 */
 		var ChessImageGenerator = require("chess-image-generator"),
 			size = 720;
 
@@ -222,148 +235,3 @@ server.get("/fenpng", (request, response) => {
 		});
 	}
 });
-
-/**
- * Function to help determine if a provided text value matches any acceptible
- * interpreted values
- *
- * @param {string} target the interpreted value we're trying to match
- * @param {string} providedText the text provided to interpreter
- */
-function isResponse(target = "", providedText = "") {
-	target = target.toLowerCase();
-	providedTextClean = providedText
-		.toLowerCase()
-		.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "")
-		.trim();
-
-	if (!responseData[target]) {
-		return false;
-	}
-	return responseData[target].includes(providedTextClean);
-}
-
-/**
- * Helper function to write gamedata to local file
- *
- * @param {string} fromPhone incoming phone number
- * @param {string} fen game data in FEN format
- */
-function saveGame(fromPhone, fen, difficulty = 2) {
-	if (!fromPhone) {
-		return;
-	}
-
-	if (typeof mariadb !== "undefined") {
-		mariadb.pool
-			.getConnection()
-			.then((conn) => {
-				if (fen === null) {
-					conn.query(
-						`UPDATE ${mariadb.table} SET fen=NULL, difficulty=${difficulty}, updated_date = CURRENT_TIMESTAMP WHERE id = '${fromPhone}'`
-					).catch((err) => {
-						conn.release();
-					});
-				} else {
-					conn.query(
-						`UPDATE ${mariadb.table} SET fen='${fen}', difficulty=${difficulty}, updated_date = CURRENT_TIMESTAMP WHERE id = '${fromPhone}'`
-					).catch((err) => {
-						conn.release();
-					});
-				}
-			})
-			.catch((err) => {
-				console.log("saveGame", err);
-			});
-	} else {
-		/**
-		 * Database either doesn't exist or isn't correctly configured... fall-back to use
-		 * text files
-		 */
-		const filename = fromPhone + ".json";
-
-		if (!fs.existsSync("./gamedata")) {
-			fs.mkdirSync("./gamedata");
-		}
-
-		let fenData = {
-			fen,
-			difficulty,
-		};
-
-		fs.writeFileSync(`./gamedata/${filename}`, JSON.stringify(fenData), "utf8");
-	}
-}
-
-/**
- * Wrapper function to reset a game
- *
- * @param {string} fromPhone phone number for associated game
- */
-function resetGame(fromPhone) {
-	saveGame(fromPhone, null);
-}
-
-/**
- * Fetch saved game data
- *
- * @param {string} fromPhone id for data
- * @param {object} body from Twilio
- */
-function fetchGame(fromPhone, body) {
-	return new Promise((resolve, reject) => {
-		if (typeof mariadb !== "undefined") {
-			mariadb.pool
-				.getConnection()
-				.then((conn) => {
-					conn.query(
-						`SELECT fen, difficulty FROM ${mariadb.table} WHERE id = '${fromPhone}'`
-					)
-						.then((rows) => {
-							if (rows[0]) {
-								resolve(rows[0]);
-							}
-						})
-						.then((res) => {
-							conn.release();
-						})
-						.catch((err) => {
-							reject(err);
-							conn.release();
-						});
-
-					conn.query(
-						`INSERT IGNORE INTO ${mariadb.table} (id, city, state, country, difficulty) VALUES ('${fromPhone}', '${body.FromCity}', '${body.FromState}', '${body.FromCountry}', 2)`
-					).catch((err) => {
-						conn.release();
-					});
-				})
-				.catch((err) => {
-					console.log("receive sql", err);
-				});
-		} else {
-			/**
-			 * Database either doesn't exist or isn't correctly configured... fall-back to store
-			 * game data in .json files
-			 */
-			const filename = fromPhone + ".json";
-			let fenData = {
-				fen: "",
-				difficulty: 2,
-			};
-
-			if (fs.existsSync(`./gamedata/${filename}`)) {
-				try {
-					fenData = fs.readFileSync(`./gamedata/${filename}`, "utf8");
-					fenData = JSON.parse(fenData);
-					resolve(fenData);
-				} catch (err) {
-					reject(err);
-					console.error("receive file", err);
-				}
-			} else {
-				resolve(fenData);
-			}
-		}
-	});
-}
