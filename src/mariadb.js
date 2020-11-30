@@ -7,6 +7,7 @@
         state varchar(2),
         country varchar(2),
         fen varchar(90),
+        difficulty tinyint,
         created_date DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_date DATETIME DEFAULT CURRENT_TIMESTAMP,
         primary key (id)

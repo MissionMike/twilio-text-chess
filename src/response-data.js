@@ -19,4 +19,14 @@ module.exports = {
 	restart: ["restart", "reset", "start over"],
 	status: ["status", "show", "show board", "where were we", "show me"],
 	commands: ["commands", "show commands", "command", "options"],
+	difficulty: [
+		"difficulty 0",
+		"difficulty 1",
+		"difficulty 2",
+		"difficulty 3",
+		"level 0",
+		"level 1",
+		"level 2",
+		"level 3",
+	],
 };
