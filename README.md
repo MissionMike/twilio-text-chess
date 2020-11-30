@@ -2,6 +2,8 @@
 
 ### Powered by Node and served via Express. Simple chatbot interaction to get the game started, followed a game!
 
+![][https://missionmike.dev/assets/twilio-text-chess.gif]
+
 Uses [js-chess-engine](https://www.npmjs.com/package/js-chess-engine) under the hood for the computer player. 
 
 To generate the board graphics, this uses [chess-image-generator](https://www.npmjs.com/package/chess-image-generator) to generate a PNG of game position layered on top of a static coordinate image via canvas.
