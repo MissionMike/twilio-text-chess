@@ -1,6 +1,4 @@
-# twilio-text-chess
-
-## Chess implementation using Twilio SMS and MMS.
+# Chess implementation using Twilio SMS and MMS.
 
 ### Powered by Node and served via Express. Simple chatbot interaction to get the game started, followed a game!
 
