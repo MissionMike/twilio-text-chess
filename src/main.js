@@ -147,7 +147,7 @@ server.post("/receive", (request, response) => {
 
 							saveGame(fromPhone, fen, difficulty);
 						} catch (err) {
-							console.log(err.message);
+							console.log(err);
 							message = err.message;
 						}
 					} else {
@@ -205,7 +205,7 @@ server.get("/fenpng", (request, response) => {
 
 		imageGenerator.loadFEN(request.query.fen);
 
-		console.log(request.query.fen);
+		console.log(`GET FEN: ${request.query.fen}`);
 
 		response.contentType("image/png");
 
