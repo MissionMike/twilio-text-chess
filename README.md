@@ -2,7 +2,9 @@
 
 ### Powered by Node and served via Express. Simple chatbot interaction to get the game started, followed a game!
 
-![][https://missionmike.dev/assets/twilio-text-chess.gif]
+![](https://missionmike.dev/assets/twilio-text-chess.gif)
+
+### Read on for details...
 
 Uses [js-chess-engine](https://www.npmjs.com/package/js-chess-engine) under the hood for the computer player. 
 
