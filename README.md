@@ -2,7 +2,7 @@
 
 ### Powered by Node and served via Express. Simple chatbot interaction to get the game started, followed a game!
 
-![](https://missionmike.dev/assets/twilio-text-chess-nonumber.gif)
+![](https://tools.missionmike.dev/assets/twilio-text-chess-nonumber.gif)
 
 ### Read on for details...
 
